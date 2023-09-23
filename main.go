@@ -19,11 +19,14 @@ func create_server(){
 	defer conn.Close() 
 	for {
 		resp := NewRespReader(conn)
-		value, err := resp.ReadValue()
-		checkError(err)
+		value, err := resp.Read()
+		if err != nil {
+			fmt.Println("Error Occured: ", err)
+			continue
+		}
 		_ = value
 		Writer := NewRespWriter(conn)
-		Writer.WriteValue(Value{typ: "string", str: "Hello World"})
+		Writer.Write(Value{typ: "string", str: "Hello World"})
 	}
 }
 func checkError(err error) {

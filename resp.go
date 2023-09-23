@@ -41,7 +41,7 @@ func (r *Resp) ReadLine() (line []byte, n int, err error) {
 		}
 		n += 1
 		line = append(line, b)
-		if len(line) >= 2 && line[n-2] == '\r' {
+		if len(line) >= 2 && line[len(line)-2] == '\r' {
 			break
 		}
 	}
@@ -54,7 +54,6 @@ func (r *Resp) readInteger() (x int, n int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	n += 1
 	i64, err := strconv.ParseInt(string(line), 10, 64)
 	if err != nil {
 		return 0, 0, err
@@ -83,7 +82,7 @@ func (r *Resp) read_array() (Value, error) {
 	}
 	var array []Value
 	for i := 0; i < size; i++ {
-		val, err := r.ReadValue()
+		val, err := r.Read()
 		if err != nil {
 			return Value{}, err
 		}
@@ -93,7 +92,7 @@ func (r *Resp) read_array() (Value, error) {
 }
 
 // func to read value from the buffer
-func (r *Resp) ReadValue() (Value, error) {
+func (r *Resp) Read() (Value, error) {
 	b, err := r.Reader.ReadByte()
 	if err != nil {
 		return Value{}, err
@@ -160,7 +159,7 @@ type Writer struct {
 func NewRespWriter(w io.Writer) *Writer {
 	return &Writer{writer: w}
 }
-func (w *Writer) WriteValue(v Value) error {
+func (w *Writer) Write(v Value) error {
 	_, err := w.writer.Write(v.Marshel())
 	if err != nil {
 		return err
