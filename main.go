@@ -16,12 +16,14 @@ func create_server(){
 	checkError(err)
 	conn, err := listener.Accept()
 	checkError(err)
-	defer conn.Close() // close connection before exit
+	defer conn.Close() 
 	for {
-		resp := NewResp(conn)
+		resp := NewRespReader(conn)
 		value, err := resp.ReadValue()
 		checkError(err)
-		fmt.Println(value)
+		_ = value
+		Writer := NewRespWriter(conn)
+		Writer.WriteValue(Value{typ: "string", str: "Hello World"})
 	}
 }
 func checkError(err error) {
