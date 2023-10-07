@@ -9,8 +9,6 @@ import (
 
 )
 
-
-
 func create_server(){
 	listener, err := net.Listen("tcp", "localhost:6379")
 	checkError(err)
