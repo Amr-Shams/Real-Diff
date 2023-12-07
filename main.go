@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/stoicperlman/fls"
@@ -43,11 +44,7 @@ func removeComments(input string) string {
 	commentRegex := regexp.MustCompile(`/\*[\s\S]*?\*/|//.*?$`)
 	return commentRegex.ReplaceAllString(input, "")
 }
-func isFunctionStart(line string) bool {
-	// Regular expression to match function start
-	functionStartRegex := regexp.MustCompile(`^\s*(?:\w+\s+)+\w+\s*\([^;]*\)\s*\{`)
-	return functionStartRegex.MatchString(line)
-}
+
 func readLineFromFile(filePath string, lineNumber int) (string, error) {
 	f, err := fls.OpenFile(filePath, os.O_RDONLY, 0)
 	if err != nil {
@@ -61,15 +58,40 @@ func readLineFromFile(filePath string, lineNumber int) (string, error) {
 		return "", err
 	}
 
-	// Read the line
-	reader := bufio.NewReader(f)
+	scanner := bufio.NewScanner(f)
+	var insideFunction bool
 
-	line, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
-		return "", err
+	// creat a buffer to store the function body
+	functionBody := strings.Builder{}
+	depth := 0
+
+	for linNum := 1; scanner.Scan(); linNum++ {
+		line := scanner.Text()
+		for _, char := range line {
+			if char == '{' {
+				depth++
+				if !insideFunction && linNum == lineNumber {
+					insideFunction = true
+				}
+
+			}
+			if insideFunction {
+				functionBody.WriteRune(char)
+			}
+			if char == '}' {
+				depth--
+				if depth == 0 && insideFunction {
+					insideFunction = false
+					break
+				}
+			}
+		}
 	}
+	// remove comments from the function body
+	// function body before removing comments
+	fmt.Println(functionBody.String())
 
-	return string(line), nil
+	return removeComments(functionBody.String()), nil
 }
 
 func main() {
@@ -80,15 +102,15 @@ func main() {
 		fmt.Println("Error:", err)
 		return
 	}
-	lineNumber := strings.Split(functionNames[0], " ")[1]
-	//convert the string to int
-	lineNumberInt := 0
-	fmt.Sscanf(lineNumber, "%d", &lineNumberInt)
-	fmt.Println(lineNumberInt)
-	_, err = readLineFromFile(cFilePath, lineNumberInt)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+	for _, LineNumber := range functionNames {
+		// convert the LineNumber to an int
+		linNum, err := strconv.Atoi(strings.Split(LineNumber, " ")[1])
+		println(linNum)
+		functionBody, err := readLineFromFile(cFilePath, linNum)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println(functionBody)
 	}
-
 }
