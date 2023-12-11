@@ -22,7 +22,7 @@ type Function struct {
 }
 
 func main() {
-	cFilePath := "../foo.c"
+	cFilePath := "../client.c"
 	start := time.Now()
 	err := cleanFile(cFilePath)
 	if err != nil {
@@ -156,7 +156,9 @@ func isStartOfFunction(linNum int, lineNumbers []int) bool {
 
 func cleanFunctionBody(functionBody string) string {
 	functionBody = string(removeCStyleComments([]byte(functionBody)))
+	fmt.Println("Function before Cpp style comment removal: ", functionBody)
 	functionBody = string(removeCppStyleComments([]byte(functionBody)))
+	fmt.Println("Function after Cpp style comment removal: ", functionBody)
 	functionBody = strings.ReplaceAll(functionBody, "\n", "")
 	functionBody = strings.ReplaceAll(functionBody, "\t", "")
 	functionBody = strings.ReplaceAll(functionBody, " ", "")
@@ -169,6 +171,6 @@ func removeCStyleComments(content []byte) []byte {
 }
 
 func removeCppStyleComments(content []byte) []byte {
-	ccmt := regexp.MustCompile(`//.*$`)
+	ccmt := regexp.MustCompile(`(?m)//.*$`)
 	return ccmt.ReplaceAll(content, []byte(""))
 }
