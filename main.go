@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -21,16 +22,15 @@ type Function struct {
 	Line int
 }
 
+// write a main func that takes in a file path
 func main() {
-	cFilePath := "../client.c"
 	start := time.Now()
-	err := cleanFile(cFilePath)
+	filePath := os.Args[1]
+	err := cleanFile(filePath)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
 	}
-	elapsed := time.Since(start)
-	fmt.Println("Time elapsed: ", elapsed)
+	fmt.Println("Time taken:", time.Since(start))
 }
 
 func cleanFile(filePath string) error {
@@ -58,7 +58,9 @@ func cleanFile(filePath string) error {
 	})
 
 	processFunctions(scanner, functions, lineNumbers)
-	fmt.Println(functions)
+	for _, function := range functions {
+		fmt.Println("Function name:", function.Name, "Line number:", function.Line, "Function body:", function.Body)
+	}
 	return nil
 }
 
@@ -108,8 +110,10 @@ func processFunctions(scanner *bufio.Scanner, functions []Function, lineNumbers 
 	var functionBody strings.Builder
 	depth := 0
 	index := 0
-
+	var state = "0"
+	var skipMultiLine bool
 	for linNum := 1; scanner.Scan(); linNum++ {
+		var skipLine bool = false
 		line := scanner.Text()
 		if !startFunction && isStartOfFunction(linNum, lineNumbers) {
 			startFunction = true
@@ -117,31 +121,90 @@ func processFunctions(scanner *bufio.Scanner, functions []Function, lineNumbers 
 		if !startFunction {
 			continue
 		}
-
+		var lastChar rune
+		var buffer bytes.Buffer
 		for _, char := range line {
+
+			switch state {
+			case "0":
+				switch char {
+				case '/':
+					state = "2"
+					buffer.WriteRune(lastChar)
+					lastChar = char
+					continue
+				default:
+					state = "0"
+					buffer.WriteRune(lastChar)
+					lastChar = char
+
+				}
+			case "2": // slash
+				switch char {
+				case '/': // single line comment
+					state = "0"
+					skipLine = true
+					buffer.Reset()
+				case '*': // multi line comment
+					state = "mc"
+					skipMultiLine = true
+					buffer.Reset()
+				default:
+					state = "0"
+					buffer.WriteRune(lastChar)
+					lastChar = char
+				}
+			case "3": // end of the multi line comment
+				switch char {
+				case '/':
+					state = "0"
+					skipMultiLine = false
+				default:
+					state = "mc"
+				}
+			case "mc": // slash
+				switch char {
+				case '*':
+					state = "3"
+				}
+			}
+
+			if skipLine || skipMultiLine {
+				continue
+			}
+
 			if char == '{' {
 				depth++
 				if !insideFunction {
 					insideFunction = true
 				}
+				buffer.Reset()
+				buffer.WriteRune(char)
 			}
-			if insideFunction {
-				functionBody.WriteRune(char)
+
+			if insideFunction && !skipLine && !skipMultiLine {
+				functionBody.WriteString(buffer.String())
+				buffer.Reset()
 			}
+
 			if char == '}' {
 				depth--
 				if depth == 0 && insideFunction {
 					insideFunction = false
 					startFunction = false
-					functionBodyString := cleanFunctionBody(functionBody.String())
-					functions[index].Body = functionBodyString
+					functionBody.WriteString(";}")
+					// the follwoing line is to remove the spaces and new lines from the function body not human readable
+					//functions[index].Body = cleanFunctionBody(functionBody.String())
+					functions[index].Body = functionBody.String()
 					index++
 					functionBody.Reset()
 					break
 				}
 			}
+
 		}
-		functionBody.WriteRune('\n')
+		functionBody.WriteString("\n")
+
 	}
 }
 
@@ -155,22 +218,8 @@ func isStartOfFunction(linNum int, lineNumbers []int) bool {
 }
 
 func cleanFunctionBody(functionBody string) string {
-	functionBody = string(removeCStyleComments([]byte(functionBody)))
-	fmt.Println("Function before Cpp style comment removal: ", functionBody)
-	functionBody = string(removeCppStyleComments([]byte(functionBody)))
-	fmt.Println("Function after Cpp style comment removal: ", functionBody)
 	functionBody = strings.ReplaceAll(functionBody, "\n", "")
 	functionBody = strings.ReplaceAll(functionBody, "\t", "")
 	functionBody = strings.ReplaceAll(functionBody, " ", "")
 	return functionBody
-}
-
-func removeCStyleComments(content []byte) []byte {
-	ccmt := regexp.MustCompile(`/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/`)
-	return ccmt.ReplaceAll(content, []byte(""))
-}
-
-func removeCppStyleComments(content []byte) []byte {
-	ccmt := regexp.MustCompile(`(?m)//.*$`)
-	return ccmt.ReplaceAll(content, []byte(""))
 }
