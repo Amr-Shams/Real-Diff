@@ -161,8 +161,14 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("ctags", "-x", "-n", "--c-kinds=f", "--_xformat=%N %S %n", cFilePath)
-	output, err := cmd.CombinedOutput()
+	// try to execute the ctags.sh script by the sudo command
+	cmd1 := exec.Command("sudo", "./scripts/ctags.sh", cFilePath)
+	err := cmd1.Run()
+	if err != nil {
+		return nil, fmt.Errorf("error running ctags: %v", err)
+	}
+	cmd2 := exec.Command("ctags", "-x", "-n", "--c-kinds=f", "--_xformat=%N %S %n", cFilePath)
+	output, err := cmd2.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
 	}
