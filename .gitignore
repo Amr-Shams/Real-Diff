@@ -1,2 +1,4 @@
 *.mod
 c2go/
+Linkered/
+ctags/
