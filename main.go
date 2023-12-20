@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,48 +61,51 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("old functions")
-	for _, function := range oldFunctions {
-		fmt.Println(function.Name, function.Body)
-		fmt.Println("------------------------------------------------------------------------------------------------------------------")
-	}
-	fmt.Println("new functions")
-	for _, function := range newFunctions {
-		fmt.Println(function.Name, function.Body)
-		fmt.Println("------------------------------------------------------------------------------------------------------------------")
-	}
+	// fmt.Println("old functions")
+	// for _, function := range oldFunctions {
+	// 	fmt.Println(function.Name, function.Body, function.Line)
+	// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
+	// }
+	// fmt.Println("new functions")
+	// for _, function := range newFunctions {
+	// 	fmt.Println(function.Name, function.Body, function.Line)
+	// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
+	// }
 	// call the getChangedFunctions function to get the functions that are changed between the 2 dates
-	// changedFunctions, DeletedFunctions, AddedFunctions := getChangedFunctions(oldFunctions, newFunctions)
-	// // create a new file to write the functions that are changed between the 2 dates
-	// f, err := os.Create(outputFile)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer f.Close()
-	// // loop over the changed functions
-	// for _, function := range changedFunctions {
-	// 	// write the function to the output file
-	// 	_, err := f.WriteString(fmt.Sprintf("%s\n", function.Name))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// // loop over the Deleted functions
-	// for _, function := range DeletedFunctions {
-	// 	// write the function to the output file
-	// 	_, err := f.WriteString(fmt.Sprintf("%s\n", function.Name))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// // loop over the Added functions
-	// for _, function := range AddedFunctions {
-	// 	// write the function to the output file
-	// 	_, err := f.WriteString(fmt.Sprintf("%s\n", function.Name))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	changedFunctions, DeletedFunctions, AddedFunctions := getChangedFunctions(oldFunctions, newFunctions)
+	// create a new file to write the functions that are changed between the 2 dates
+	f, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// loop over the changed functions
+	f.Write([]byte("Changed Functions\n"))
+	for _, function := range changedFunctions {
+		// write the function to the output file
+		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		if err != nil {
+			return err
+		}
+	}
+	// loop over the Deleted functions
+	f.Write([]byte("Deleted Functions\n"))
+	for _, function := range DeletedFunctions {
+		// write the function to the output file
+		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		if err != nil {
+			return err
+		}
+	}
+	// loop over the Added functions
+	f.Write([]byte("Added Functions\n"))
+	for _, function := range AddedFunctions {
+		// write the function to the output file
+		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 
 }
@@ -159,7 +161,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("ctags", "-x", "--c-kinds=f", cFilePath)
+	cmd := exec.Command("ctags", "-x", "-n", "--c-kinds=f", "--_xformat=%N %S %n", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -169,11 +171,11 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
 		if len(lineList) > 0 {
-			lineNumber, err := strconv.Atoi(lineList[2])
+			lineNumber, err := strconv.Atoi(lineList[len(lineList)-1])
 			if err != nil {
-				return nil, fmt.Errorf("error converting line number to integer: %v", err)
+				return nil, fmt.Errorf("error parsing line number: %v", err)
 			}
-			functionSignature := extractFunctionSignature(lineList)
+			functionSignature := strings.Join(lineList[:len(lineList)-1], " ")
 			functions = append(functions, Function{Name: functionSignature, Line: lineNumber})
 		}
 	}
@@ -181,15 +183,15 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	return functions, nil
 }
 
-func extractFunctionSignature(lineList []string) string {
-	functionSignature := strings.Join(lineList[4:], " ")
-	re := regexp.MustCompile(`^[\w\s]*\(\)`)
-	matches := re.FindStringSubmatch(functionSignature)
-	if len(matches) > 0 {
-		functionSignature = matches[0]
-	}
-	return functionSignature
-}
+// func extractFunctionSignature(lineList []string) string {
+// 	functionSignature := strings.Join(lineList[4:], " ")
+// 	re := regexp.MustCompile(`^[\w\s]*\(\)`)
+// 	matches := re.FindStringSubmatch(functionSignature)
+// 	if len(matches) > 0 {
+// 		functionSignature = matches[0]
+// 	}
+// 	return functionSignature
+// }
 
 func extractLineNumbers(functions []Function) []int {
 	lineNumbers := []int{}
@@ -315,50 +317,36 @@ func cleanFunctionBody(functionBody string) string {
 	functionBody = strings.ReplaceAll(functionBody, " ", "")
 	return functionBody
 }
-
-// function to get the functions that are changed/Added/removed between the 2 dates
 func getChangedFunctions(oldFunctions []Function, newFunctions []Function) ([]Function, []Function, []Function) {
-	// the functions that are changed
+	oldFunctionMap := make(map[string]Function)
+	newFunctionMap := make(map[string]Function)
+
+	for _, function := range oldFunctions {
+		oldFunctionMap[function.Name] = function
+	}
+
+	for _, function := range newFunctions {
+		newFunctionMap[function.Name] = function
+	}
+
 	var changedFunctions []Function
-	// the functions that are Added
-	var AddedFunctions []Function
-	// the functions that are Deleted
-	var DeletedFunctions []Function
-	// loop over the new functions
-	for _, newFunction := range newFunctions {
-		// loop over the old functions
-		for _, oldFunction := range oldFunctions {
-			// if the function is the same in both dates
-			if newFunction.Name == oldFunction.Name {
-				// if the function body is not the same in both dates
-				if newFunction.Body != oldFunction.Body {
-					// add the function to the changed functions list
-					changedFunctions = append(changedFunctions, newFunction)
-				}
-			} else {
-				// if the function is not the same in both dates
-				// add the function to the Added functions list
-				AddedFunctions = append(AddedFunctions, newFunction)
-			}
+	var addedFunctions []Function
+	var deletedFunctions []Function
+
+	for name, newFunction := range newFunctionMap {
+		oldFunction, ok := oldFunctionMap[name]
+		if !ok {
+			addedFunctions = append(addedFunctions, newFunction)
+		} else if oldFunction.Body != newFunction.Body {
+			changedFunctions = append(changedFunctions, newFunction)
 		}
 	}
-	// loop over the old functions
-	for _, oldFunction := range oldFunctions {
-		// loop over the new functions
-		for _, newFunction := range newFunctions {
-			// if the function is the same in both dates
-			if newFunction.Name == oldFunction.Name {
-				// if the function body is not the same in both dates
-				if newFunction.Body != oldFunction.Body {
-					// add the function to the changed functions list
-					changedFunctions = append(changedFunctions, newFunction)
-				}
-			} else {
-				// if the function is not the same in both dates
-				// add the function to the Deleted functions list
-				DeletedFunctions = append(DeletedFunctions, oldFunction)
-			}
+
+	for name, oldFunction := range oldFunctionMap {
+		if _, ok := newFunctionMap[name]; !ok {
+			deletedFunctions = append(deletedFunctions, oldFunction)
 		}
 	}
-	return changedFunctions, DeletedFunctions, AddedFunctions
+
+	return changedFunctions, addedFunctions, deletedFunctions
 }

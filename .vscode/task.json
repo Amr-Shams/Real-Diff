@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "deactivateConda",
+            "type": "shell",
+            "command": "conda deactivate",
+            "problemMatcher": []
+        }
+    ]
+}
