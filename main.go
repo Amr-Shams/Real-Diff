@@ -10,21 +10,27 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stoicperlman/fls"
 )
 
-// Var that holds the info of the functionailty of the code
 var removeAndExtract = &cobra.Command{
-	Use:           "datedcoverage -m test_path -N newDate -O oldDate -f filterFile",
-	Short:         "generate html report based on changes between 2 dates",
+	Use:           "datedcoverage -m <module_path> -N <new_date> -O <old_date> -f <filter_file>",
+	Short:         "Generates a dated coverage report based on changes between two dates",
 	RunE:          removeAndExtractFunctions,
 	SilenceErrors: true,
 	Long: strings.TrimSpace(`
-The command datedcoverage is used to generate another version of the coverage.info file called dated_coverage.info by
-keeping only the lines that where added or modified between 2 dates that the user should specify,
-the command is a wrapper around  'gcov_gen_report'
+The 'datedcoverage' command generates a dated coverage report by keeping only the lines that were added or modified between two specified dates. 
+It takes four arguments: 
+- module_path: The path to the module to be analyzed
+- new_date: The end date for the period to be analyzed
+- old_date: The start date for the period to be analyzed
+- filter_file: The file containing the functions to be filtered
+
+The command generates a new version of the 'coverage.info' file called 'dated_coverage.info'. 
+This command is a wrapper around the 'gcov_gen_report' functionality.
 		`),
 }
 
@@ -332,21 +338,38 @@ func getChangedFunctions(oldFunctions []Function, newFunctions []Function) ([]Fu
 	var changedFunctions []Function
 	var addedFunctions []Function
 	var deletedFunctions []Function
-
+	// loop over the new functions
 	for name, newFunction := range newFunctionMap {
 		oldFunction, ok := oldFunctionMap[name]
+		// if the function is not in the old functions then it is added
 		if !ok {
 			addedFunctions = append(addedFunctions, newFunction)
 		} else if oldFunction.Body != newFunction.Body {
+			// if the function is in the old functions and the body is not the same then it is changed
 			changedFunctions = append(changedFunctions, newFunction)
 		}
 	}
 
 	for name, oldFunction := range oldFunctionMap {
+		// if the function is not in the new functions then it is deleted
 		if _, ok := newFunctionMap[name]; !ok {
 			deletedFunctions = append(deletedFunctions, oldFunction)
 		}
 	}
 
 	return changedFunctions, addedFunctions, deletedFunctions
+}
+
+// function that takes a date and returns the weekday
+func getWeekDay(date string) string {
+	// convert the date to time
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// get the weekday
+	weekday := t.Weekday().String()
+	// convert the weekday to lower case
+	weekday = strings.ToLower(weekday)
+	return weekday
 }
