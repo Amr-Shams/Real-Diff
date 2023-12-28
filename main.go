@@ -27,8 +27,8 @@ It takes four arguments:
 - module_path: The path to the module to be analyzed
 - new_date: The end date for the period to be analyzed
 - old_date: The start date for the period to be analyzed
-- filter_file: The file containing the functions to be filtered
-
+- filter_file: The file that contains the list of the source files to be analyzed
+- src_files: The list of the source files to be analyzed
 The command generates a new version of the 'coverage.info' file called 'dated_coverage.info'. 
 This command is a wrapper around the 'gcov_gen_report' functionality.
 		`),
@@ -44,6 +44,8 @@ var (
 	oldDate string
 	// the output file
 	outputFile string
+	// the list of the src files
+	srcFiles string
 )
 
 // Function represents a function in the C source code
@@ -56,64 +58,85 @@ type Function struct {
 
 // the main functionality the takes the arguments and the path of the C file and returns the functions in the file
 func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
-	// call the removeCommentsAndExtractFunctions function to get the functions in the C file from both dates using the testPath
-	oldFile := fmt.Sprintf("%s/%s", testPath, oldDate)
-	newFile := fmt.Sprintf("%s/%s", testPath, newDate)
-	oldFunctions, err := removeCommentsAndExtractFunctions(oldFile)
+	// check if srcFiles is not empty
+	if srcFiles == "" {
+		return fmt.Errorf("srcFiles cannot be empty")
+	}
+	// check if we can open the srcFiles file
+	srcFilesFile, err := os.Open(srcFiles)
 	if err != nil {
 		return err
 	}
-	newFunctions, err := removeCommentsAndExtractFunctions(newFile)
-	if err != nil {
-		return err
-	}
-	// fmt.Println("old functions")
-	// for _, function := range oldFunctions {
-	// 	fmt.Println(function.Name, function.Body, function.Line)
-	// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
-	// }
-	// fmt.Println("new functions")
-	// for _, function := range newFunctions {
-	// 	fmt.Println(function.Name, function.Body, function.Line)
-	// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
-	// }
-	// call the getChangedFunctions function to get the functions that are changed between the 2 dates
-	changedFunctions, DeletedFunctions, AddedFunctions := getChangedFunctions(oldFunctions, newFunctions)
-	// create a new file to write the functions that are changed between the 2 dates
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// loop over the changed functions
-	f.Write([]byte("Changed Functions\n"))
-	for _, function := range changedFunctions {
-		// write the function to the output file
-		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+	// close the file
+	defer srcFilesFile.Close()
+	// create a scanner to read the srcFiles file
+	scanner := bufio.NewScanner(srcFilesFile)
+
+	// loop over the src files
+	for scanner.Scan() {
+		// get the src file name
+		result := scanner.Text()
+
+		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
+
+		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
+		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
+		oldFunctions, err := removeCommentsAndExtractFunctions(oldFile)
 		if err != nil {
 			return err
 		}
-	}
-	// loop over the Deleted functions
-	f.Write([]byte("Deleted Functions\n"))
-	for _, function := range DeletedFunctions {
-		// write the function to the output file
-		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		newFunctions, err := removeCommentsAndExtractFunctions(newFile)
 		if err != nil {
 			return err
 		}
-	}
-	// loop over the Added functions
-	f.Write([]byte("Added Functions\n"))
-	for _, function := range AddedFunctions {
-		// write the function to the output file
-		_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		// fmt.Println("old functions")
+		// for _, function := range oldFunctions {
+		// 	fmt.Println(function.Name, function.Body, function.Line)
+		// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
+		// }
+		// fmt.Println("new functions")
+		// for _, function := range newFunctions {
+		// 	fmt.Println(function.Name, function.Body, function.Line)
+		// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
+		// }
+		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
+		changedFunctions, DeletedFunctions, AddedFunctions := getChangedFunctions(oldFunctions, newFunctions)
+		// create a new file to write the functions that are changed between the 2 dates
+		f, err := os.Create(outputFile)
 		if err != nil {
 			return err
+		}
+		defer f.Close()
+		// loop over the changed functions
+		f.Write([]byte("Changed Functions\n"))
+		for _, function := range changedFunctions {
+			// write the function to the output file
+			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+			if err != nil {
+				return err
+			}
+		}
+		// loop over the Deleted functions
+		f.Write([]byte("Deleted Functions\n"))
+		for _, function := range DeletedFunctions {
+			// write the function to the output file
+			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+			if err != nil {
+				return err
+			}
+		}
+		// loop over the Added functions
+		f.Write([]byte("Added Functions\n"))
+		for _, function := range AddedFunctions {
+			// write the function to the output file
+			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
-
 }
 
 // init function that takes the arguments from the command line
@@ -122,11 +145,13 @@ func init() {
 	removeAndExtract.Flags().StringVarP(&newDate, "newDate", "N", "", "the new date")
 	removeAndExtract.Flags().StringVarP(&oldDate, "oldDate", "O", "", "the old date")
 	removeAndExtract.Flags().StringVarP(&outputFile, "outputFile", "f", "", "the output file")
+	removeAndExtract.Flags().StringVarP(&srcFiles, "srcFiles", "s", "", "the list of the src files")
 	// mark some flags as required not to be empty
 	removeAndExtract.MarkFlagRequired("testPath")
 	removeAndExtract.MarkFlagRequired("newDate")
 	removeAndExtract.MarkFlagRequired("oldDate")
 	removeAndExtract.MarkFlagRequired("outputFile")
+	removeAndExtract.MarkFlagRequired("srcFiles")
 
 }
 
@@ -373,3 +398,11 @@ func getWeekDay(date string) string {
 	weekday = strings.ToLower(weekday)
 	return weekday
 }
+
+//////////////////////////////
+/*
+*@TODO:
+- add a function that takes the list of functions and returns thier test cases from the db.
+- store the result in a set and return it
+- then we can count how many functions are covered by the test cases
+*/
