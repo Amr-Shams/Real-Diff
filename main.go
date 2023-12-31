@@ -127,6 +127,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		}
 		// check if the file has changed/added/deleted functions
 		if quit := len(changedFunctions) + len(DeletedFunctions) + len(AddedFunctions); quit == 0 {
+			fmt.Println("No changes in file:", result)
 			continue
 		}
 		// add the src file to the list of the src files
