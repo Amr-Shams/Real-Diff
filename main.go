@@ -137,7 +137,9 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		AddedFunctions = append(AddedFunctions, temp3...)
 	}
 	// remove the last comma
-	srcFilesList = srcFilesList[:len(srcFilesList)-1]
+	if len(srcFilesList) > 0 {
+		srcFilesList = srcFilesList[:len(srcFilesList)-1]
+	}
 	// call the getTestCases function to get the test cases that cover all the changed/added/deleted functions
 	var AllFunctions []Function
 	AllFunctions = append(AllFunctions, changedFunctions...)
@@ -428,7 +430,9 @@ func getTestCases(functions []Function, srcFiles string) []string {
 		functionsString += function.Name + ","
 	}
 	// remove the last comma
-	functionsString = functionsString[:len(functionsString)-1]
+	if len(functionsString) > 0 {
+		functionsString = functionsString[:len(functionsString)-1]
+	}
 	// excutte the command of the follwoing format
 	// gogcov search testcases --srcfiles <srcfiles> --products productname --functions <functions>
 	// the output of the command is a list of the test cases that cover the functions write them into the output file
@@ -442,8 +446,11 @@ func getTestCases(functions []Function, srcFiles string) []string {
 	}
 	// split the output by new line
 	testCases := strings.Split(string(output), "\n")
-	// remove the last element which is empty
-	testCases = testCases[:len(testCases)-1]
+	if len(testCases) > 0 {
+		// remove the last element which is empty
+		testCases = testCases[:len(testCases)-1]
+	}
+
 	return testCases
 }
 
