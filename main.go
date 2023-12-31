@@ -143,7 +143,11 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	AllFunctions = append(AllFunctions, changedFunctions...)
 	AllFunctions = append(AllFunctions, DeletedFunctions...)
 	AllFunctions = append(AllFunctions, AddedFunctions...)
+	// for debugging
+	fmt.Println("All Functions:", AllFunctions)
 	testCases := getTestCases(AllFunctions, srcFilesList)
+	// for debugging
+	fmt.Println("Test Cases:", testCases)
 	// call the writeToFile function to write the test cases to the output file
 	writeToFile(outputFile+"testCases", testCases)
 	return nil
