@@ -146,7 +146,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	AllFunctions = append(AllFunctions, DeletedFunctions...)
 	AllFunctions = append(AllFunctions, AddedFunctions...)
 	// for debugging
-	fmt.Println("All Functions:", AllFunctions)
+	if len(AllFunctions) == 0 || len(srcFilesList) == 0 {
+		fmt.Println("No changes in the module")
+		return nil
+	}
 	testCases := getTestCases(AllFunctions, srcFilesList)
 	// for debugging
 	fmt.Println("Test Cases:", testCases)
