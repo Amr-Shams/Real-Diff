@@ -93,7 +93,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
 		temp1, temp2, temp3 := getChangedFunctions(oldFunctions, newFunctions)
 		// create a new file to write the functions that are changed between the 2 dates
-		f, err := os.Create(outputFile + "/" + result)
+		f, err := os.Create(result + ".functions")
 		if err != nil {
 			return err
 		}
