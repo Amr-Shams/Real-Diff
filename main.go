@@ -387,16 +387,15 @@ func getChangedFunctions(oldFunctions []Function, newFunctions []Function) ([]Fu
 
 // function that takes a date and returns the weekday
 func getWeekDay(date string) string {
-	// convert the date to time
-	t, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		fmt.Println(err)
+	date_list := strings.Split(date, ".")
+	date_list_int := [3]int{}
+	for i, val := range date_list {
+		intVar, _ := strconv.Atoi(val)
+		date_list_int[i] = intVar
 	}
-	// get the weekday
-	weekday := t.Weekday().String()
-	// convert the weekday to lower case
-	weekday = strings.ToLower(weekday)
-	return weekday
+	d := time.Date(date_list_int[0], time.Month(date_list_int[1]), date_list_int[2], 0, 0, 0, 0, time.Local)
+	return strings.ToLower(d.Weekday().String())
+
 }
 
 //////////////////////////////
