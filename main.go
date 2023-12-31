@@ -27,7 +27,7 @@ It takes four arguments:
 - module_path: The path to the module to be analyzed
 - new_date: The end date for the period to be analyzed
 - old_date: The start date for the period to be analyzed
-- filter_file: The file that contains the list of the source files to be analyzed
+- filter_file: The file that contains the list of the functions already covered by the test cases
 - src_files: The list of the source files to be analyzed
 The command generates a new version of the 'coverage.info' file called 'dated_coverage.info'. 
 This command is a wrapper around the 'gcov_gen_report' functionality.
@@ -83,12 +83,20 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
 		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
 		oldFunctions, err := removeCommentsAndExtractFunctions(oldFile)
+		// error file not found is
+		// check if the file is not found
 		if err != nil {
-			return err
+			// if the file is not found then continue to the next file
+			if strings.Contains(err.Error(), "no such file or directory") {
+				continue
+			}
 		}
 		newFunctions, err := removeCommentsAndExtractFunctions(newFile)
 		if err != nil {
-			return err
+			// if the file is not found then continue to the next file
+			if strings.Contains(err.Error(), "no such file or directory") {
+				continue
+			}
 		}
 		// fmt.Println("old functions")
 		// for _, function := range oldFunctions {
