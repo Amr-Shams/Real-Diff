@@ -29,6 +29,7 @@ It takes four arguments:
 - old_date: The start date for the period to be analyzed
 - filter_file: The file that contains the list of the functions already covered by the test cases
 - src_files: The list of the source files to be analyzed
+- product: The product name
 The command generates a new version of the 'coverage.info' file called 'dated_coverage.info'. 
 This command is a wrapper around the 'gcov_gen_report' functionality.
 		`),
@@ -46,6 +47,8 @@ var (
 	outputFile string
 	// the list of the src files
 	srcFiles string
+	// the product name
+	product string
 )
 
 // Function represents a function in the C source code
@@ -72,7 +75,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	// create a scanner to read the srcFiles file
 	scanner := bufio.NewScanner(srcFilesFile)
 
+	// srcfiles list as string separated by comma
+	var srcFilesList string
 	// loop over the src files
+	changedFunctions, DeletedFunctions, AddedFunctions := []Function{}, []Function{}, []Function{}
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
@@ -82,36 +88,12 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
 		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
-		oldFunctions, err := removeCommentsAndExtractFunctions(oldFile)
-		// error file not found is
-		// check if the file is not found
-		if err != nil {
-			// if the file is not found then continue to the next file
-			if strings.Contains(err.Error(), "no such file or directory") {
-				continue
-			}
-		}
-		newFunctions, err := removeCommentsAndExtractFunctions(newFile)
-		if err != nil {
-			// if the file is not found then continue to the next file
-			if strings.Contains(err.Error(), "no such file or directory") {
-				continue
-			}
-		}
-		// fmt.Println("old functions")
-		// for _, function := range oldFunctions {
-		// 	fmt.Println(function.Name, function.Body, function.Line)
-		// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
-		// }
-		// fmt.Println("new functions")
-		// for _, function := range newFunctions {
-		// 	fmt.Println(function.Name, function.Body, function.Line)
-		// 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
-		// }
+		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
+		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
-		changedFunctions, DeletedFunctions, AddedFunctions := getChangedFunctions(oldFunctions, newFunctions)
+		temp1, temp2, temp3 := getChangedFunctions(oldFunctions, newFunctions)
 		// create a new file to write the functions that are changed between the 2 dates
-		f, err := os.Create(outputFile)
+		f, err := os.Create(outputFile + "/" + result)
 		if err != nil {
 			return err
 		}
@@ -143,7 +125,26 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		}
+		// check if the file has changed/added/deleted functions
+		if quit := len(changedFunctions) + len(DeletedFunctions) + len(AddedFunctions); quit == 0 {
+			continue
+		}
+		// add the src file to the list of the src files
+		srcFilesList += result + ","
+		changedFunctions = append(changedFunctions, temp1...)
+		DeletedFunctions = append(DeletedFunctions, temp2...)
+		AddedFunctions = append(AddedFunctions, temp3...)
 	}
+	// remove the last comma
+	srcFilesList = srcFilesList[:len(srcFilesList)-1]
+	// call the getTestCases function to get the test cases that cover all the changed/added/deleted functions
+	var AllFunctions []Function
+	AllFunctions = append(AllFunctions, changedFunctions...)
+	AllFunctions = append(AllFunctions, DeletedFunctions...)
+	AllFunctions = append(AllFunctions, AddedFunctions...)
+	testCases := getTestCases(AllFunctions, srcFilesList)
+	// call the writeToFile function to write the test cases to the output file
+	writeToFile(outputFile+"testCases", testCases)
 	return nil
 }
 
@@ -154,6 +155,8 @@ func init() {
 	removeAndExtract.Flags().StringVarP(&oldDate, "oldDate", "O", "", "the old date")
 	removeAndExtract.Flags().StringVarP(&outputFile, "outputFile", "f", "", "the output file")
 	removeAndExtract.Flags().StringVarP(&srcFiles, "srcFiles", "s", "", "the list of the src files")
+	removeAndExtract.Flags().StringVarP(&srcFiles, "product", "p", "", "the product name")
+
 	// mark some flags as required not to be empty
 	removeAndExtract.MarkFlagRequired("testPath")
 	removeAndExtract.MarkFlagRequired("newDate")
@@ -413,3 +416,49 @@ func getWeekDay(date string) string {
 - store the result in a set and return it
 - then we can count how many functions are covered by the test cases
 */
+func getTestCases(functions []Function, srcFiles string) []string {
+	// concatenate the names of the functions to a string separated by comma
+	var functionsString string
+	for _, function := range functions {
+		functionsString += function.Name + ","
+	}
+	// remove the last comma
+	functionsString = functionsString[:len(functionsString)-1]
+	// excutte the command of the follwoing format
+	// gogcov search testcases --srcfiles <srcfiles> --products productname --functions <functions>
+	// the output of the command is a list of the test cases that cover the functions write them into the output file
+	if product == "" {
+		product = "calibre"
+	}
+	cmd := exec.Command("gogcov", "search", "testcases", "--srcfiles", srcFiles, "--products", "calibre", "--functions", functionsString)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	// split the output by new line
+	testCases := strings.Split(string(output), "\n")
+	// remove the last element which is empty
+	testCases = testCases[:len(testCases)-1]
+	return testCases
+}
+
+//////////////////////////////
+/*
+* function to write to an output file
+ */
+func writeToFile(outputFile string, testCases []string) {
+	// create a new file to write the functions that are changed between the 2 dates
+	f, err := os.Create(outputFile)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	defer f.Close()
+	// loop over the changed functions
+	for _, testCase := range testCases {
+		// write the function to the output file
+		_, err := f.WriteString(fmt.Sprintf("%s\n", testCase))
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
+	}
+}
