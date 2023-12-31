@@ -78,6 +78,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	// srcfiles list as string separated by comma
 	var srcFilesList string
 	// loop over the src files
+	f, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
 	changedFunctions, DeletedFunctions, AddedFunctions := []Function{}, []Function{}, []Function{}
 	for scanner.Scan() {
 		// get the src file name
@@ -93,10 +97,6 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
 		temp1, temp2, temp3 := getChangedFunctions(oldFunctions, newFunctions)
 		// create a new file to write the functions that are changed between the 2 dates
-		f, err := os.Create(result + ".functions")
-		if err != nil {
-			return err
-		}
 		defer f.Close()
 		// loop over the changed functions
 		f.Write([]byte("Changed Functions\n"))
