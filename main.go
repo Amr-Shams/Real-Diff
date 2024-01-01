@@ -95,10 +95,15 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
 		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+
+		fmt.Println("oldFile:", oldFile)
+		fmt.Println("newFile:", newFile)
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
 		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
 		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
 		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
+		// fmt.Println(oldFunctions)
+		// fmt.Println(newFunctions)
 		// write the functions to the a new file
 		f, err := os.Create(outputFile + "functions_before_after")
 		if err != nil {
