@@ -263,8 +263,8 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		lineList := strings.Fields(line)
 		// the first filed the function tag only till the space
 		functionName := strings.Split(lineList[0], " ")[0]
-		// the second field is the line number till the ;
-		lineNumber := strings.Split(lineList[2], ";")[0]
+		// the third field is the line number
+		lineNumber := lineList[2]
 		// convert the line number to int
 		lineNumberInt, err := strconv.Atoi(lineNumber)
 		if err != nil {
@@ -272,6 +272,8 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		}
 		// the fifth field is the function signature till the first space
 		functionSignature := strings.Split(lineList[4], " ")[0]
+		// split function signature by the first : and take the second part
+		functionSignature = strings.SplitN(functionSignature, ":", 2)[1]
 
 		// add the function tag to the functions list
 
