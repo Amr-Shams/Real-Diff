@@ -252,7 +252,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("./ctags/ctags", "-x", "-n", "--c-kinds=f", "--_xformat=%N %S %n", cFilePath)
+	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -261,20 +261,23 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
-		if len(lineList) > 0 {
-			lineNumber, err := strconv.Atoi(lineList[len(lineList)-1])
-			if err != nil {
-				return nil, fmt.Errorf("error parsing line number: %v", err)
-			}
-			functionSignature := strings.Join(lineList[:len(lineList)-1], " ")
-			// check if the function has arguments
-			// if it doesn't have args remove it
-			if !strings.Contains(functionSignature, "(") {
-				continue
-			}
-			functionName := strings.Split(functionSignature, "(")[0]
-			functions = append(functions, Function{Name: functionSignature, NameWithoutArgs: functionName, Line: lineNumber})
+		// the first filed the function tag only till the space
+		functionName := strings.Split(lineList[0], " ")[0]
+		// the second field is the line number till the ;
+		lineNumber := strings.Split(lineList[2], ";")[0]
+		// convert the line number to int
+		lineNumberInt, err := strconv.Atoi(lineNumber)
+		if err != nil {
+			return nil, fmt.Errorf("error converting line number to int: %v", err)
 		}
+		// the fifth field is the function signature take it from the class: then the rest
+		functionSignature := strings.Join(lineList[4:], " ")
+		// remove the class: from the function signature
+		functionSignature = strings.ReplaceAll(functionSignature, "class:", "")
+		// remove the spaces from the function signature
+		functionSignature = strings.ReplaceAll(functionSignature, " ", "")
+		// add the function tag to the functions list
+		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature, Line: lineNumberInt})
 	}
 
 	return functions, nil
