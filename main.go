@@ -106,22 +106,22 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		}
 		defer f.Close()
 
-		f.Write([]byte("Old Functions\n"))
-		for _, function := range oldFunctions {
-			// write the function to the output file
-			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
-			if err != nil {
-				return err
-			}
-		}
-		f.Write([]byte("New Functions\n"))
-		for _, function := range newFunctions {
-			// write the function to the output file
-			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
-			if err != nil {
-				return err
-			}
-		}
+		// f.Write([]byte("Old Functions\n"))
+		// for _, function := range oldFunctions {
+		// 	// write the function to the output file
+		// 	_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
+		// f.Write([]byte("New Functions\n"))
+		// for _, function := range newFunctions {
+		// 	// write the function to the output file
+		// 	_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
 		changedFunctions, AddedFunctions, DeletedFunctions := getChangedFunctions(oldFunctions, newFunctions)
