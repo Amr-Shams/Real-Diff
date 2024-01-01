@@ -262,6 +262,11 @@ func getFunctions(cFilePath string) ([]Function, error) {
 				return nil, fmt.Errorf("error parsing line number: %v", err)
 			}
 			functionSignature := strings.Join(lineList[:len(lineList)-1], " ")
+			// check if the function has arguments
+			// if it doesn't have args remove it
+			if !strings.Contains(functionSignature, "(") {
+				continue
+			}
 			functionName := strings.Split(functionSignature, "(")[0]
 			functions = append(functions, Function{Name: functionSignature, NameWithoutArgs: functionName, Line: lineNumber})
 		}
