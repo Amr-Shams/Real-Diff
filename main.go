@@ -277,7 +277,12 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		// remove the spaces from the function signature
 		functionSignature = strings.ReplaceAll(functionSignature, " ", "")
 		// add the function tag to the functions list
-		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature, Line: lineNumberInt})
+
+		// print all of the above
+		fmt.Println("functionName:", functionName)
+		fmt.Println("lineNumber:", lineNumberInt)
+		fmt.Println("functionSignature:", functionSignature)
+
 	}
 
 	return functions, nil
