@@ -281,6 +281,7 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		fmt.Println("functionName:", functionName)
 		fmt.Println("lineNumber:", lineNumberInt)
 		fmt.Println("functionSignature:", functionSignature)
+		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature + "::" + functionName, Line: lineNumberInt})
 
 	}
 
