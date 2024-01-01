@@ -270,12 +270,9 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error converting line number to int: %v", err)
 		}
-		// the fifth field is the function signature take it from the class: then the rest
-		functionSignature := strings.Join(lineList[4:], " ")
-		// remove the class: from the function signature
-		functionSignature = strings.ReplaceAll(functionSignature, "class:", "")
-		// remove the spaces from the function signature
-		functionSignature = strings.ReplaceAll(functionSignature, " ", "")
+		// the fifth field is the function signature till the first space
+		functionSignature := strings.Split(lineList[4], " ")[0]
+
 		// add the function tag to the functions list
 
 		// print all of the above
