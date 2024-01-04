@@ -643,13 +643,18 @@ func processSrcFile(filePath string) ([]File, error) {
 		}
 		fileNameWithExtLower := strings.ToLower(fileNameWithExt)
 		if strings.HasSuffix(fileNameWithExtLower, ".cpp") || strings.HasSuffix(fileNameWithExtLower, ".c") || strings.HasSuffix(fileNameWithExtLower, ".cxx") || strings.HasSuffix(fileNameWithExtLower, ".c++") || strings.HasSuffix(fileNameWithExtLower, ".c") {
-
 			fileMap[fileName] = File{SourceFile: fileNameWithExt, HeaderFile: fileMap[fileName].HeaderFile}
 		} else if strings.HasSuffix(fileNameWithExtLower, ".h") || strings.HasSuffix(fileNameWithExtLower, ".hpp") || strings.HasSuffix(fileNameWithExtLower, ".hxx") || strings.HasSuffix(fileNameWithExtLower, ".h++") {
 			fileMap[fileName] = File{HeaderFile: fileNameWithExt, SourceFile: fileMap[fileName].SourceFile}
 		}
 	}
-
+	for fileName, file := range fileMap {
+		if file.HeaderFile != "" && file.SourceFile == "" {
+			fileMap[fileName] = File{HeaderFile: file.HeaderFile, SourceFile: fileName + ".cpp"}
+		} else if file.SourceFile != "" && file.HeaderFile == "" {
+			fileMap[fileName] = File{HeaderFile: fileName + ".hpp", SourceFile: file.SourceFile}
+		}
+	}
 	for _, file := range fileMap {
 		files = append(files, file)
 	}
