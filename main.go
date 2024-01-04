@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,6 +61,13 @@ type Function struct {
 	Line            int
 }
 
+// a file
+type File struct {
+	HeaderFile string
+	SourceFile string
+	Functions  []Function
+}
+
 // the main functionality the takes the arguments and the path of the C file and returns the functions in the file
 func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	// check if srcFiles is not empty
@@ -104,6 +112,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// fmt.Println("newFile:", newFile)
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
 		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
+
 		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
 		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
 		// fmt.Println(oldFunctions)
@@ -254,7 +263,16 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 	processFunctions(scanner, functions, lineNumbers)
 	return functions, nil
 }
+//////////////////////////////
+/*
+* function to set the line number and body for the list of functions names 
+* 
+*/
 
+//////////////////////////////
+/*
+* function to set the functionn name and signature from a src file
+*/
 func getFunctions(cFilePath string) ([]Function, error) {
 	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
@@ -564,4 +582,45 @@ func writeToFile(outputFile string, testCases []string) {
 			fmt.Println("Error:", err)
 		}
 	}
+}
+
+//////////////////////////////
+/***************** Process the input src file *****************/
+/*
+*@ this function takes the path of the src file and in a list of src files
+* it will split the src file into header and source files
+* from the header set the functions name and signature
+* from the source set the functions body and line number
+ */
+func processSrcFile(filePath string) ([]File, error) {
+	// open the file
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	var files []File
+	fileMap := make(map[string]File)
+	for scanner.Scan() {
+		fileNameWithExt := scanner.Text()
+		fileName := strings.TrimSuffix(fileNameWithExt, filepath.Ext(fileNameWithExt))
+		if _, exists := fileMap[fileName]; !exists {
+			fileMap[fileName] = File{}
+		}
+		fileNameWithExtLower := strings.ToLower(fileNameWithExt)
+		if strings.HasSuffix(fileNameWithExtLower, ".cpp") || strings.HasSuffix(fileNameWithExtLower, ".c") || strings.HasSuffix(fileNameWithExtLower, ".cxx") || strings.HasSuffix(fileNameWithExtLower, ".c++") || strings.HasSuffix(fileNameWithExtLower, ".c") {
+
+			fileMap[fileName] = File{SourceFile: fileNameWithExt, HeaderFile: fileMap[fileName].HeaderFile}
+		} else if strings.HasSuffix(fileNameWithExtLower, ".h") || strings.HasSuffix(fileNameWithExtLower, ".hpp") || strings.HasSuffix(fileNameWithExtLower, ".hxx") || strings.HasSuffix(fileNameWithExtLower, ".h++") {
+			fileMap[fileName] = File{HeaderFile: fileNameWithExt, SourceFile: fileMap[fileName].SourceFile}
+		}
+	}
+
+	for _, file := range fileMap {
+		files = append(files, file)
+	}
+
+	return files, nil
 }
