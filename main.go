@@ -96,9 +96,9 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 
 		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
 		// if the file is header file skip it all (hpp, h, hxx, h++)
-		if strings.Contains(result, ".hpp") || strings.Contains(result, ".h") || strings.Contains(result, ".hxx") || strings.Contains(result, ".h++") {
-			continue
-		}
+		// if strings.Contains(result, ".hpp") || strings.Contains(result, ".h") || strings.Contains(result, ".hxx") || strings.Contains(result, ".h++") {
+		// 	continue
+		// }
 
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
@@ -256,7 +256,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
+	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -265,6 +265,9 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
+		if len(lineList) == 0 {
+			continue
+		}
 		// the first filed the function tag only till the space
 		functionName := strings.Split(lineList[0], " ")[0]
 		// the third field is the line number
@@ -272,10 +275,14 @@ func getFunctions(cFilePath string) ([]Function, error) {
 			continue
 		}
 		lineNumber := lineList[2]
+		// clear the string from ; and "
+		lineNumber = strings.ReplaceAll(lineNumber, ";", "")
+		lineNumber = strings.ReplaceAll(lineNumber, "\"", "")
 		// convert the line number to int
 		lineNumberInt, err := strconv.Atoi(lineNumber)
 		if err != nil {
-			return nil, fmt.Errorf("error converting line number to int: %v", err)
+			fmt.Println("Line:", lineList)
+			continue
 		}
 		var functionSignature string
 		if len(lineList) > 4 {
