@@ -122,7 +122,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		f, err := os.Create(strings.Split(outputFile, ".")[0] + file.SourceFile + "_functions" + ".txt")
+		f, err := os.Create(strings.Split(outputFile, ".")[0] + "_functions" + ".txt")
 		if err != nil {
 			return err
 		}
