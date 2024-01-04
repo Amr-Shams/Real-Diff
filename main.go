@@ -75,14 +75,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("srcFiles cannot be empty")
 	}
 	// check if we can open the srcFiles file
-	srcFilesFile, err := os.Open(srcFiles)
+	srcFilesFile, err := processSrcFile(srcFiles)
 	if err != nil {
 		return err
 	}
-	// close the file
-	defer srcFilesFile.Close()
-	// create a scanner to read the srcFiles file
-	scanner := bufio.NewScanner(srcFilesFile)
 
 	// srcfiles list as string separated by comma
 	var srcFilesList string
@@ -96,29 +92,37 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer f.Close()
-	for scanner.Scan() {
-		// get the src file name
-		result := scanner.Text()
+	for _, file := range srcFilesFile {
 
-		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
-
-		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
-		// if the file is header file skip it all (hpp, h, hxx, h++)
-		// if strings.Contains(result, ".hpp") || strings.Contains(result, ".h") || strings.Contains(result, ".hxx") || strings.Contains(result, ".h++") {
-		// 	continue
-		// }
+		oldFileHeaderFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + file.HeaderFile // the src file path in mgc home
+		oldFileSourceFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + file.SourceFile // the src file path in mgc home
+		newFileHeaderFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + file.HeaderFile // the src file path in mgc home
+		newFileSourceFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + file.SourceFile // the src file path in mgc home
 
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
 		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
 
-		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
-		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
-		// fmt.Println(oldFunctions)
-		// fmt.Println(newFunctions)
-		// write the functions to the a new file
-		f, err := os.Create(outputFile + "functions_before_after")
+		oldFunctions, err := setFunctionNameAndSignature(oldFileHeaderFile)
+		if err != nil {
+			return err
+		}
+		newFunctions, err := setFunctionNameAndSignature(newFileHeaderFile)
+		if err != nil {
+			return err
+		}
+		// set the line number and body for the list of functions names
+		err = setFuncBodyAndLine(oldFileSourceFile, oldFunctions)
+		if err != nil {
+			return err
+		}
+		err = setFuncBodyAndLine(newFileSourceFile, newFunctions)
+		if err != nil {
+			return err
+		}
+
+		f, err := os.Create(strings.Split(outputFile, ".")[0] + file.SourceFile + "_functions" + ".txt")
 		if err != nil {
 			return err
 		}
@@ -172,11 +176,11 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		}
 		// check if the file has changed/added/deleted functions
 		if quit := len(DeletedFunctions) + len(AddedFunctions) + len(changedFunctions); quit == 0 {
-			fmt.Println("No changes in file:", result)
+			fmt.Println("No changes in file:", file.SourceFile)
 			continue
 		}
-		fmt.Println("the file has changed/added/deleted functions:", result)
-		srcFilesList += result + ","
+		fmt.Println("the file has changed/added/deleted functions:", file.SourceFile)
+		srcFilesList += file.SourceFile + "," + file.HeaderFile + ","
 		for _, function := range changedFunctions {
 			AllFunctions += function.NameWithoutArgs + ","
 		}
@@ -236,90 +240,119 @@ func main() {
 	}
 }
 
-func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
-	f, err := fls.OpenFile(filePath, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+// func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
+// 	f, err := fls.OpenFile(filePath, os.O_RDONLY, 0)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer f.Close()
 
-	_, err = f.Seek(0, io.SeekStart)
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
+// 	_, err = f.Seek(0, io.SeekStart)
+// 	if err != nil && err != io.EOF {
+// 		return nil, err
+// 	}
 
-	scanner := bufio.NewScanner(f)
-	functions, err := getFunctions(filePath)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return nil, err
-	}
+// 	scanner := bufio.NewScanner(f)
+// 	functions, err := getFunctions(filePath)
+// 	if err != nil {
+// 		fmt.Println("Error:", err)
+// 		return nil, err
+// 	}
 
-	lineNumbers := extractLineNumbers(functions)
-	sort.Slice(functions, func(i, j int) bool {
-		return functions[i].Line < functions[j].Line
-	})
+// 	lineNumbers := extractLineNumbers(functions)
+// 	sort.Slice(functions, func(i, j int) bool {
+// 		return functions[i].Line < functions[j].Line
+// 	})
 
-	processFunctions(scanner, functions, lineNumbers)
-	return functions, nil
-}
-//////////////////////////////
-/*
-* function to set the line number and body for the list of functions names 
-* 
-*/
+// 	processFunctions(scanner, functions, lineNumbers)
+// 	return functions, nil
+// }
 
 //////////////////////////////
 /*
-* function to set the functionn name and signature from a src file
-*/
-func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
+* function to set the line number and body for the list of functions names
+*
+ */
+func setFuncBodyAndLine(filePath string, functions []Function) error {
+	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=%n", "-o", "-", filePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("error running ctags: %v", err)
+		return err
 	}
-
-	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
 		if len(lineList) == 0 {
 			continue
 		}
-		// the first filed the function tag only till the space
+		// itterate over the fiels and find the filed that srats with line:
+		for _, field := range lineList {
+			if strings.HasPrefix(field, "line:") {
+				lineNumber, err := strconv.Atoi(strings.Split(field, ":")[1])
+				if err != nil {
+					return err
+				}
+				functions[0].Line = lineNumber
+				break
+			}
+		}
+	}
+	// set  the body of the function
+	f, err := fls.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	// sort the functions by line number
+	sort.Slice(functions, func(i, j int) bool {
+		return functions[i].Line < functions[j].Line
+	})
+	lineNumbers := extractLineNumbers(functions)
+	scanner := bufio.NewScanner(f)
+	processFunctions(scanner, functions, lineNumbers)
+	return nil
+}
+
+//////////////////////////////
+/*
+* function to set the functionn name and signature from a src file
+ */
+func setFunctionNameAndSignature(filePath string) ([]Function, error) {
+	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", filePath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running ctags: %v", err)
+	}
+	functions := []Function{}
+	for _, line := range strings.Split(string(output), "\n") {
+		lineList := strings.Fields(line)
+		if len(lineList) < 2 {
+			continue
+		}
+
 		functionName := strings.Split(lineList[0], " ")[0]
+		if lineList[0] == "operator" {
+			functionName = lineList[0] + lineList[1]
+		}
 		// the third field is the line number
 		if len(lineList) < 3 {
 			continue
 		}
-		lineNumber := lineList[2]
-		// clear the string from ; and "
-		lineNumber = strings.ReplaceAll(lineNumber, ";", "")
-		lineNumber = strings.ReplaceAll(lineNumber, "\"", "")
-		// convert the line number to int
-		lineNumberInt, err := strconv.Atoi(lineNumber)
-		if err != nil {
-			fmt.Println("Line:", lineList)
-			continue
-		}
 		var functionSignature string
-		if len(lineList) > 4 {
-			if lineList[4] == "typeref:" {
-				functionSignature = strings.Split(lineList[5], " ")[0]
-			} else {
-				functionSignature = strings.Split(lineList[4], " ")[0]
+		for _, field := range lineList {
+			if strings.HasPrefix(field, "class:") {
+				functionSignature = field
+				break
 			}
-			// the fifth field is the function signature till the first space
-			// split function signature by the first : and take the second part
-			fmt.Println("functionSignature:", functionSignature)
-			functionSignature += "::"
 		}
 		functionSignature += functionName
 		fmt.Println("functionName:", functionName)
-		fmt.Println("lineNumber:", lineNumberInt)
 		fmt.Println("functionSignature:", functionSignature)
-		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature, Line: lineNumberInt})
-
+		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature})
 	}
 
 	return functions, nil
@@ -440,7 +473,6 @@ func processFunctions(scanner *bufio.Scanner, functions []Function, lineNumbers 
 
 		}
 		//functionBody.WriteString("\n")
-
 	}
 }
 
