@@ -55,10 +55,10 @@ var (
 // Function represents a function in the C source code
 
 type Function struct {
-	Name            string
-	NameWithoutArgs string
-	Body            string
-	Line            int
+	Name               string
+	fullyQualifiedName string
+	Body               string
+	Line               int
 }
 
 // the main functionality the takes the arguments and the path of the C file and returns the functions in the file
@@ -84,26 +84,27 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if testPath != "" {
 		outputFile = testPath + "/" + outputFile
 	}
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
 
-		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		// oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
-		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		// newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
-		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
-		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
+		oldFile :=  "./"  + result // the src file path in mgc home
+		newFile := "./" + result // the src file path in mgc home
 		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
 		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
-		// fmt.Println(oldFunctions)
-		// fmt.Println(newFunctions)
+		for _, function := range oldFunctions {
+			fmt.Println("oldFunction:", function)
+		}
+		for _, function := range newFunctions {
+			fmt.Println("newFunction:", function)
+		}
+		
 		// write the functions to the a new file
 		f, err := os.Create(outputFile + "functions_before_after")
 		if err != nil {
@@ -165,13 +166,13 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		fmt.Println("the file has changed/added/deleted functions:", result)
 		srcFilesList += result + ","
 		for _, function := range changedFunctions {
-			AllFunctions += function.NameWithoutArgs + ","
+			AllFunctions += function.fullyQualifiedName + ","
 		}
 		for _, function := range AddedFunctions {
-			AllFunctions += function.NameWithoutArgs + ","
+			AllFunctions += function.fullyQualifiedName + ","
 		}
 		for _, function := range DeletedFunctions {
-			AllFunctions += function.NameWithoutArgs + ","
+			AllFunctions += function.fullyQualifiedName + ","
 		}
 
 	}
@@ -252,8 +253,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-
-	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
+	cmd := exec.Command("ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -262,48 +262,40 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
-		if len(lineList) < 1 {
+		if len(lineList) == 0 {
 			continue
 		}
-		// check if the operator is the function name 
-
-		functionName := strings.Split(lineList[0], " ")[0]
+		functionName := lineList[0]
+		if functionName == "operator" {
+			functionName += lineList[1]
+		}
 		if len(lineList) < 2 {
 			continue
 		}
-		if functionName == "operator" {
-			// the function name is the second field + the first field
-			functionName += lineList[1]
-		}
-		// the look into the fileds where the regex is number;"
-		regex := regexp.MustCompile(`\d+;/"`)
-		var lineNumber string
+		var lineNumber int
 		for _, field := range lineList {
-		lineNumber = regex.FindString(field)
-		if lineNumber != "" {
-			break
-			}
-		}
-		// remove the last 2 characters which are the ";"
-		cleanedLineNumber := lineNumber[:len(lineNumber)-2]
-		// convert the line number to int
-		lineNumberInt, err := strconv.Atoi(cleanedLineNumber)
-		if err != nil {
-			return nil, fmt.Errorf("error converting line number to int: %v", err)
-		}
-		var functionSignature string
-		for _, field := range lineList[1:] {
-			if strings.Contains(field, "class:") {
-				functionSignature += field +"::"
+			if strings.HasSuffix(field, ";\"") {
+				lineNumberString := strings.TrimSuffix(field, ";\"")
+				lineNumber, err = strconv.Atoi(lineNumberString)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing line number: %v", err)
+				}
 				break
 			}
 		}
-		functionSignature += functionName
-		fmt.Println("functionName:", functionName)
-		fmt.Println("lineNumber:", lineNumberInt)
-		fmt.Println("functionSignature:", functionSignature)
-		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature, Line: lineNumberInt})
-
+		// now itterate over the line list to get the class:
+		var className string
+		for _, field := range lineList {
+			if strings.HasPrefix(field, "class:") {
+				className = strings.TrimPrefix(field, "class:")
+				className += "::"
+				break
+			}
+		}
+		// check in the className a string with __anno* replace it with (anonymous namespace)
+		re := regexp.MustCompile(`__anon\w*`)
+		className = re.ReplaceAllString(className, "(anonymous namespace)")
+		functions = append(functions, Function{Line: lineNumber, fullyQualifiedName: className + functionName, Name: functionName})
 	}
 
 	return functions, nil
@@ -368,6 +360,7 @@ func processFunctions(scanner *bufio.Scanner, functions []Function, lineNumbers 
 					skipLine = true
 					buffer.Reset()
 				case '*': // multi line comment
+
 					state = "mc"
 					skipMultiLine = true
 					buffer.Reset()
