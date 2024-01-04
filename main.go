@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -95,11 +96,6 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
 		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
-		// if the file is header file skip it all (hpp, h, hxx, h++)
-		if strings.Contains(result, ".hpp") || strings.Contains(result, ".h") || strings.Contains(result, ".hxx") || strings.Contains(result, ".h++") {
-			continue
-		}
-
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
 		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
@@ -269,29 +265,39 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		if len(lineList) < 1 {
 			continue
 		}
+		// check if the operator is the function name 
+
 		functionName := strings.Split(lineList[0], " ")[0]
 		if len(lineList) < 2 {
 			continue
 		}
-		// the third field is the line number
-		lineNumberStr := lineList[2]
+		if functionName == "operator" {
+			// the function name is the second field + the first field
+			functionName += lineList[1]
+		}
+		// the look into the fileds where the regex is number;"
+		regex := regexp.MustCompile(`\d+;/"`)
+		var lineNumber string
+		for _, field := range lineList {
+		lineNumber = regex.FindString(field)
+		if lineNumber != "" {
+			break
+			}
+		}
+		// remove the last 2 characters which are the ";"
+		cleanedLineNumber := lineNumber[:len(lineNumber)-2]
 		// convert the line number to int
-		cleanedLineNumber := strings.ReplaceAll(lineNumberStr, ";", "")
-		cleanedLineNumber = strings.ReplaceAll(cleanedLineNumber, "\"", "")
-
 		lineNumberInt, err := strconv.Atoi(cleanedLineNumber)
 		if err != nil {
-			// Handle the error
+			return nil, fmt.Errorf("error converting line number to int: %v", err)
 		}
 		var functionSignature string
-		if len(lineList) > 4 {
-			// the fifth field is the function signature till the first space
-			functionSignature = strings.Split(lineList[4], " ")[0]
-			// split function signature by the first : and take the second part
-			functionSignature = strings.SplitN(functionSignature, ":", 2)[1]
-			functionSignature = functionSignature + "::"
+		for _, field := range lineList[1:] {
+			if strings.Contains(field, "class:") {
+				functionSignature += field +"::"
+				break
+			}
 		}
-
 		functionSignature += functionName
 		fmt.Println("functionName:", functionName)
 		fmt.Println("lineNumber:", lineNumberInt)
