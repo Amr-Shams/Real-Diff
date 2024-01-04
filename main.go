@@ -112,6 +112,8 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("oldFunctions:", len(oldFunctions))
+		fmt.Println("newFunctions:", len(newFunctions))
 		// set the line number and body for the list of functions names
 		err = setFuncBodyAndLine(oldFileSourceFile, oldFunctions)
 		if err != nil {
@@ -120,13 +122,6 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		err = setFuncBodyAndLine(newFileSourceFile, newFunctions)
 		if err != nil {
 			return err
-		}
-		// print the info of the functions
-		for _, function := range oldFunctions {
-			fmt.Println("oldFunction:", function.Name, function.NameWithoutArgs, function.Line, function.Body)
-		}
-		for _, function := range newFunctions {
-			fmt.Println("newFunction:", function.Name, function.NameWithoutArgs, function.Line, function.Body)
 		}
 
 		f, err := os.Create(strings.Split(outputFile, ".")[0] + "_functions" + ".txt")
@@ -294,6 +289,7 @@ func setFuncBodyAndLine(filePath string, functions []Function) error {
 		// itterate over the fiels and find the filed that srats with line:
 		for _, field := range lineList {
 			if strings.HasPrefix(field, "line:") {
+				fmt.Println("field:", field)
 				lineNumber, err := strconv.Atoi(strings.Split(field, ":")[1])
 				if err != nil {
 					return err
@@ -319,6 +315,7 @@ func setFuncBodyAndLine(filePath string, functions []Function) error {
 		return functions[i].Line < functions[j].Line
 	})
 	lineNumbers := extractLineNumbers(functions)
+	fmt.Println("lineNumbers:", lineNumbers)
 	scanner := bufio.NewScanner(f)
 	processFunctions(scanner, functions, lineNumbers)
 	return nil
@@ -352,7 +349,7 @@ func setFunctionNameAndSignature(filePath string) ([]Function, error) {
 		var functionSignature string
 		for _, field := range lineList {
 			if strings.HasPrefix(field, "class:") {
-				functionSignature = field
+				functionSignature = field + "::"
 				break
 			}
 		}
