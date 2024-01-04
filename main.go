@@ -95,6 +95,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
 		newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		// if the file is header file skip it all (hpp, h, hxx, h++)
+		if strings.Contains(result, ".hpp") || strings.Contains(result, ".h") || strings.Contains(result, ".hxx") || strings.Contains(result, ".h++") {
+			continue
+		}
 
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
@@ -252,6 +256,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
+
 	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -261,9 +266,13 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
-		fmt.Println("lineList:", lineList)
-		// the first filed the function tag only till the space
+		if len(lineList) < 1 {
+			continue
+		}
 		functionName := strings.Split(lineList[0], " ")[0]
+		if len(lineList) < 2 {
+			continue
+		}
 		// the third field is the line number
 		lineNumberStr := lineList[2]
 		// convert the line number to int
