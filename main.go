@@ -261,27 +261,33 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
+		fmt.Println("lineList:", lineList)
 		// the first filed the function tag only till the space
 		functionName := strings.Split(lineList[0], " ")[0]
 		// the third field is the line number
-		lineNumber := lineList[2]
+		lineNumberStr := lineList[2]
 		// convert the line number to int
-		lineNumberInt, err := strconv.Atoi(lineNumber)
+		cleanedLineNumber := strings.ReplaceAll(lineNumberStr, ";", "")
+		cleanedLineNumber = strings.ReplaceAll(cleanedLineNumber, "\"", "")
+
+		lineNumberInt, err := strconv.Atoi(cleanedLineNumber)
 		if err != nil {
-			return nil, fmt.Errorf("error converting line number to int: %v", err)
+			// Handle the error
 		}
-		// the fifth field is the function signature till the first space
-		functionSignature := strings.Split(lineList[4], " ")[0]
-		// split function signature by the first : and take the second part
-		functionSignature = strings.SplitN(functionSignature, ":", 2)[1]
+		var functionSignature string
+		if len(lineList) > 4 {
+			// the fifth field is the function signature till the first space
+			functionSignature = strings.Split(lineList[4], " ")[0]
+			// split function signature by the first : and take the second part
+			functionSignature = strings.SplitN(functionSignature, ":", 2)[1]
+			functionSignature = functionSignature + "::"
+		}
 
-		// add the function tag to the functions list
-
-		// print all of the above
+		functionSignature += functionName
 		fmt.Println("functionName:", functionName)
 		fmt.Println("lineNumber:", lineNumberInt)
 		fmt.Println("functionSignature:", functionSignature)
-		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature + "::" + functionName, Line: lineNumberInt})
+		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature, Line: lineNumberInt})
 
 	}
 
