@@ -83,11 +83,6 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if testPath != "" {
 		outputFile = testPath + "/" + outputFile
 	}
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
@@ -291,7 +286,7 @@ func getFunctions(cFilePath string) ([]Function, error) {
 				break
 			}
 		}
-		functions = append(functions, Function{Line: lineNumber, Name: className + functionName, fullyQualifiedName: functionName})
+		functions = append(functions, Function{Line: lineNumber, fullyQualifiedName: className + functionName, Name: functionName})
 	}
 
 	return functions, nil
