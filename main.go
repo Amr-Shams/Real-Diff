@@ -256,8 +256,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-
-	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
+	cmd := exec.Command("ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -266,32 +265,30 @@ func getFunctions(cFilePath string) ([]Function, error) {
 	functions := []Function{}
 	for _, line := range strings.Split(string(output), "\n") {
 		lineList := strings.Fields(line)
-		if len(lineList) < 1 {
-			continue
-		}
+		// the first filed the function tag only till the space
 		functionName := strings.Split(lineList[0], " ")[0]
-		if len(lineList) < 2 {
+		// the third field is the line number
+		if len(lineList) < 3 {
 			continue
 		}
-		// the third field is the line number
-		lineNumberStr := lineList[2]
+		lineNumber := lineList[2]
 		// convert the line number to int
-		cleanedLineNumber := strings.ReplaceAll(lineNumberStr, ";", "")
-		cleanedLineNumber = strings.ReplaceAll(cleanedLineNumber, "\"", "")
-
-		lineNumberInt, err := strconv.Atoi(cleanedLineNumber)
+		lineNumberInt, err := strconv.Atoi(lineNumber)
 		if err != nil {
-			// Handle the error
+			return nil, fmt.Errorf("error converting line number to int: %v", err)
 		}
 		var functionSignature string
 		if len(lineList) > 4 {
+			if lineList[4] == "typeref:" {
+				functionSignature = strings.Split(lineList[5], " ")[0]
+			} else {
+				functionSignature = strings.Split(lineList[4], " ")[0]
+			}
 			// the fifth field is the function signature till the first space
-			functionSignature = strings.Split(lineList[4], " ")[0]
 			// split function signature by the first : and take the second part
-			functionSignature = strings.SplitN(functionSignature, ":", 2)[1]
-			functionSignature = functionSignature + "::"
+			fmt.Println("functionSignature:", functionSignature)
+			functionSignature += "::"
 		}
-
 		functionSignature += functionName
 		fmt.Println("functionName:", functionName)
 		fmt.Println("lineNumber:", lineNumberInt)
