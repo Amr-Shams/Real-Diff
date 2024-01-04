@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -286,6 +287,9 @@ func getFunctions(cFilePath string) ([]Function, error) {
 				break
 			}
 		}
+		// check in the className a string with __anno* replace it with (anonymous namespace)
+		re := regexp.MustCompile(`__anon\w*`)
+		className = re.ReplaceAllString(className, "(anonymous namespace)")
 		functions = append(functions, Function{Line: lineNumber, fullyQualifiedName: className + functionName, Name: functionName})
 	}
 
