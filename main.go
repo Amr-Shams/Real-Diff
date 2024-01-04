@@ -106,7 +106,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 
 		oldFunctions, err := setFunctionNameAndSignature(oldFileHeaderFile)
 		if err != nil {
-			return err
+			continue
 		}
 		newFunctions, err := setFunctionNameAndSignature(newFileHeaderFile)
 		if err != nil {
@@ -115,11 +115,18 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// set the line number and body for the list of functions names
 		err = setFuncBodyAndLine(oldFileSourceFile, oldFunctions)
 		if err != nil {
-			return err
+			continue
 		}
 		err = setFuncBodyAndLine(newFileSourceFile, newFunctions)
 		if err != nil {
 			return err
+		}
+		// print the info of the functions
+		for _, function := range oldFunctions {
+			fmt.Println("oldFunction:", function.Name, function.NameWithoutArgs, function.Line, function.Body)
+		}
+		for _, function := range newFunctions {
+			fmt.Println("newFunction:", function.Name, function.NameWithoutArgs, function.Line, function.Body)
 		}
 
 		f, err := os.Create(strings.Split(outputFile, ".")[0] + "_functions" + ".txt")
@@ -350,8 +357,8 @@ func setFunctionNameAndSignature(filePath string) ([]Function, error) {
 			}
 		}
 		functionSignature += functionName
-		fmt.Println("functionName:", functionName)
-		fmt.Println("functionSignature:", functionSignature)
+		// fmt.Println("functionName:", functionName)
+		// fmt.Println("functionSignature:", functionSignature)
 		functions = append(functions, Function{Name: functionName, NameWithoutArgs: functionSignature})
 	}
 
