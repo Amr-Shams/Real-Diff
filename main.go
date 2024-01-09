@@ -84,6 +84,10 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if testPath != "" {
 		outputFile = testPath + "/" + outputFile
 	}
+	f,err := os.Create(outputFile)
+	if err!=nil{
+		return err
+	}
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
@@ -105,13 +109,6 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			fmt.Println("newFunction:", function)
 		}
 		
-		// write the functions to the a new file
-		f, err := os.Create(outputFile + "functions_before_after")
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
 		// f.Write([]byte("Old Functions\n"))
 		// for _, function := range oldFunctions {
 		// 	// write the function to the output file
@@ -191,11 +188,11 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		fmt.Println("No changes in the module")
 		return nil
 	}
-	testCases := getTestCases(AllFunctions, srcFilesList)
+	// testCases := getTestCases(AllFunctions, srcFilesList)
 	// for debugging
-	fmt.Println("Test Cases:", testCases)
+	// fmt.Println("Test Cases:", testCases)
 	// call the writeToFile function to write the test cases to the output file
-	writeToFile(outputFile+"testCases", testCases)
+	// writeToFile(outputFile+"testCases", testCases)
 	return nil
 }
 
