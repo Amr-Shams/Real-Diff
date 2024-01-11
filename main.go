@@ -186,18 +186,33 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if len(AllFunctions) > 0 {
 		AllFunctions = AllFunctions[:len(AllFunctions)-1]
 	}
-
-	// call the getTestCases function to get the test cases that cover all the changed/added/deleted functions
-
-	// for debugging
-	if len(AllFunctions) == 0 || len(srcFilesList) == 0 {
-		fmt.Println("No changes in the module")
-		return nil
-	}
 	if scan == false {
 		fmt.Println("No need to scan for test cases")
 		return nil
 	}
+	// write the functions annd the srcfile to a speartae file 
+	f , err = os.Create(outputFile + "srcFiles.txt")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// write the functions to the output file
+	_, err = f.WriteString(fmt.Sprintf("%s\n", srcFilesList))
+	if err != nil {
+		return err
+	}
+	// write the functions to another file
+	f, err = os.Create(outputFile + "functions.txt")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// write the functions to the output file
+	_, err = f.WriteString(fmt.Sprintf("%s\n", AllFunctions))
+	if err != nil {
+		return err
+	}
+
 	testCases := getTestCases(AllFunctions, srcFilesList)
 	writeToFile(outputFile+"testCases", testCases)
 	return nil
