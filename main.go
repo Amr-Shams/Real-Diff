@@ -50,6 +50,8 @@ var (
 	srcFiles string
 	// the product name
 	product string
+	// boolean to check if the user want to scan for test cases
+	scan bool
 )
 
 // Function represents a function in the C source code
@@ -84,6 +86,12 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if testPath != "" {
 		outputFile = testPath + "/" + outputFile
 	}
+
+	f, err := os.Create(outputFile + ".txt")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
@@ -101,11 +109,11 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// fmt.Println(oldFunctions)
 		// fmt.Println(newFunctions)
 		// write the functions to the a new file
-		f, err := os.Create(outputFile + "functions_before_after")
-		if err != nil {
-			return err
-		}
-		defer f.Close()
+		// f, err := os.Create(outputFile + "functions_before_after")
+		// if err != nil {
+		// 	return err
+		// }
+		// defer f.Close()
 
 		// f.Write([]byte("Old Functions\n"))
 		// for _, function := range oldFunctions {
@@ -186,10 +194,11 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		fmt.Println("No changes in the module")
 		return nil
 	}
+	if scan == false {
+		fmt.Println("No need to scan for test cases")
+		return nil
+	}
 	testCases := getTestCases(AllFunctions, srcFilesList)
-	// for debugging
-	fmt.Println("Test Cases:", testCases)
-	// call the writeToFile function to write the test cases to the output file
 	writeToFile(outputFile+"testCases", testCases)
 	return nil
 }
@@ -202,6 +211,7 @@ func init() {
 	removeAndExtract.Flags().StringVarP(&outputFile, "outputFile", "f", "", "the output file")
 	removeAndExtract.Flags().StringVarP(&srcFiles, "srcFiles", "s", "", "the list of the src files")
 	removeAndExtract.Flags().StringVarP(&srcFiles, "product", "p", "", "the product name")
+	removeAndExtract.Flags().BoolVarP(&scan, "scan", "c", false, "scan for test cases")
 
 	// mark some flags as required not to be empty
 	removeAndExtract.MarkFlagRequired("newDate")
