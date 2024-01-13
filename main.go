@@ -92,6 +92,13 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer f.Close()
+	// create another outputfile called summary 
+	f1, err := os.Create(outputFile + "_summary.txt")
+	if err != nil {
+		return err
+	}
+	defer f1.Close()
+	var listSrcFiles []string // 1 means it is changed/add/deleted 0 means it is not
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
@@ -131,21 +138,31 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		// 		return err
 		// 	}
 		// }
-
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
 		changedFunctions, AddedFunctions, DeletedFunctions := getChangedFunctions(oldFunctions, newFunctions)
 		// loop over the changed functions
-		f.Write([]byte("Changed Functions\n"))
-		for _, function := range changedFunctions {
+		// check if the file has changed/added/deleted functions
+		if quit := len(DeletedFunctions) + len(AddedFunctions) + len(changedFunctions); quit == 0 {
+			listSrcFiles = append(listSrcFiles, result)
+			fmt.Println("No changes in file:", result)
+			continue
+		}
+		f.Write([]byte(result + "\n"))
+		for idx, function := range changedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Changed Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
 				return err
 			}
 		}
-		// loop over the Deleted functions
-		f.Write([]byte("Deleted Functions\n"))
-		for _, function := range DeletedFunctions {
+
+		for idx, function := range DeletedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Deleted Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
@@ -153,18 +170,15 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			}
 		}
 		// loop over the Added functions
-		f.Write([]byte("Added Functions\n"))
-		for _, function := range AddedFunctions {
+		for idx, function := range AddedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Added Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
 				return err
 			}
-		}
-		// check if the file has changed/added/deleted functions
-		if quit := len(DeletedFunctions) + len(AddedFunctions) + len(changedFunctions); quit == 0 {
-			fmt.Println("No changes in file:", result)
-			continue
 		}
 		fmt.Println("the file has changed/added/deleted functions:", result)
 		srcFilesList += result + ","
@@ -178,6 +192,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			AllFunctions += function.fullyQualifiedName + ","
 		}
 
+		f.Write([]byte("/*******************/\n"))
 	}
 	// remove the last comma
 	if len(srcFilesList) > 0 {
@@ -190,31 +205,14 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		fmt.Println("No need to scan for test cases")
 		return nil
 	}
-	// write the functions annd the srcfile to a speartae file 
-	f , err = os.Create(outputFile + "srcFiles.txt")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", srcFilesList))
-	if err != nil {
-		return err
-	}
-	// write the functions to another file
-	f, err = os.Create(outputFile + "functions.txt")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", AllFunctions))
-	if err != nil {
-		return err
-	}
+	writeToFileStr(outputFile+"srcFiles.txt", srcFilesList)
+	
+	writeToFileStr(outputFile+"functions.txt", AllFunctions)
 
+	writeToFileList(outputFile+"_summary.txt", listSrcFiles)
 	testCases := getTestCases(AllFunctions, srcFilesList)
-	writeToFile(outputFile+"testCases", testCases)
+	writeToFileList(outputFile+"testCases", testCases)
+
 	return nil
 }
 
@@ -515,33 +513,7 @@ func getWeekDay(date string) string {
 */
 func getTestCases(functions string, srcFiles string) []string {
 
-	// writ the srcfle into a file
-	f, err := os.Create(outputFile + "srcFiles")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", srcFiles))
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	//write the functions to another file
-	f, err = os.Create(outputFile + "functions")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", functions))
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	// excutte the command of the follwoing format
-	// gogcov search testcases --srcfiles <srcfiles> --products productname --functions <functions>
-	// the output of the command is a list of the test cases that cover the functions write them into the output file
-	cmdArgs := []string{"gogcov", "search", "testcases", "--srcfiles", srcFiles, "--functions", functions}
+	cmdArgs := []string{"gogcov", "search", "testcases", "--srcfiles-file", outputFile + "srcFiles.txt", "--functions-file", outputFile + "functions.txt"}
 	if product != "" {
 		cmdArgs = append(cmdArgs, "--products", product)
 	}
@@ -564,7 +536,7 @@ func getTestCases(functions string, srcFiles string) []string {
 /*
 * function to write to an output file
  */
-func writeToFile(outputFile string, testCases []string) {
+func writeToFileList(outputFile string, testCases []string) {
 	// create a new file to write the functions that are changed between the 2 dates
 	f, err := os.Create(outputFile)
 	if err != nil {
@@ -579,4 +551,22 @@ func writeToFile(outputFile string, testCases []string) {
 			fmt.Println("Error:", err)
 		}
 	}
+}
+
+//////////////////////////////
+/*
+* function to write a string to an output file
+ */
+
+func writeToFileStr(outputFile string, functions string) {
+	f, err := os.Create(outputFile)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	defer f.Close()
+	_, err = f.WriteString(fmt.Sprintf("%s\n", functions))
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
 }
