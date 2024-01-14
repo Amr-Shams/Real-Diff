@@ -18,7 +18,7 @@ import (
 )
 
 var removeAndExtract = &cobra.Command{
-	Use:           "datedcoverage -m <module_path> -N <new_date> -O <old_date> -f <filter_file>",
+	Use:           "datedcoverage -m <module_path> -N <new_date> -O <old_date> -f <filter_file> -s <src_files> -p <product> -c<scan>",
 	Short:         "Generates a dated coverage report based on changes between two dates",
 	RunE:          removeAndExtractFunctions,
 	SilenceErrors: true,
@@ -31,6 +31,7 @@ It takes four arguments:
 - filter_file: The file that contains the list of the functions already covered by the test cases
 - src_files: The list of the source files to be analyzed
 - product: The product name
+- scan: A boolean to check if the user want to scan for test cases
 The command generates a new version of the 'coverage.info' file called 'dated_coverage.info'. 
 This command is a wrapper around the 'gcov_gen_report' functionality.
 		`),
