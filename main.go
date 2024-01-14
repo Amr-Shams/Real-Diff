@@ -92,7 +92,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer f.Close()
-	// create another outputfile called summary 
+	// create another outputfile called summary
 	f1, err := os.Create(outputFile + "_summary.txt")
 	if err != nil {
 		return err
@@ -201,15 +201,17 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if len(AllFunctions) > 0 {
 		AllFunctions = AllFunctions[:len(AllFunctions)-1]
 	}
+	writeToFileStr(outputFile+"srcFiles.txt", srcFilesList)
+
+	writeToFileStr(outputFile+"functions.txt", AllFunctions)
+
+	writeToFileList(outputFile+"_summary.txt", listSrcFiles)
+
 	if scan == false {
 		fmt.Println("No need to scan for test cases")
 		return nil
 	}
-	writeToFileStr(outputFile+"srcFiles.txt", srcFilesList)
-	
-	writeToFileStr(outputFile+"functions.txt", AllFunctions)
 
-	writeToFileList(outputFile+"_summary.txt", listSrcFiles)
 	testCases := getTestCases(AllFunctions, srcFilesList)
 	writeToFileList(outputFile+"testCases", testCases)
 
@@ -564,6 +566,7 @@ func writeToFileStr(outputFile string, functions string) {
 		fmt.Println("Error:", err)
 	}
 	defer f.Close()
+	functions = strings.ReplaceAll(functions, ",", "\n")
 	_, err = f.WriteString(fmt.Sprintf("%s\n", functions))
 	if err != nil {
 		fmt.Println("Error:", err)
