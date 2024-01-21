@@ -293,6 +293,11 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		if len(lineList) < 2 {
 			continue
 		}
+		// check if the unc is lambda function
+		re := regexp.MustCompile(`__anon\w*`)
+		if re.MatchString(functionName) {
+			continue
+		}
 		var lineNumber int
 		for _, field := range lineList {
 			if strings.HasSuffix(field, ";\"") {
@@ -314,7 +319,6 @@ func getFunctions(cFilePath string) ([]Function, error) {
 			}
 		}
 		// check in the className a string with __anno* replace it with (anonymous namespace)
-		re := regexp.MustCompile(`__anon\w*`)
 		className = re.ReplaceAllString(className, "(anonymous namespace)")
 		functions = append(functions, Function{Line: lineNumber, fullyQualifiedName: className + functionName, Name: functionName})
 	}
