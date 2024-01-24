@@ -459,6 +459,8 @@ func cleanFunctionBody(functionBody string) string {
 	functionBody = strings.ReplaceAll(functionBody, "\n", "")
 	functionBody = strings.ReplaceAll(functionBody, "\t", "")
 	functionBody = strings.ReplaceAll(functionBody, " ", "")
+	functionBody = strings.ReplaceAll(functionBody, "\r", "")
+	functionBody = strings.ReplaceAll(functionBody, "\x00", "")
 	return functionBody
 }
 func getChangedFunctions(oldFunctions []Function, newFunctions []Function) ([]Function, []Function, []Function) {
