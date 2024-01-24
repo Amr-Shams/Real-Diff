@@ -84,8 +84,8 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if testPath != "" {
 		outputFile = testPath + "/" + outputFile
 	}
-	f,err := os.Create(outputFile)
-	if err!=nil{
+	f, err := os.Create(outputFile)
+	if err != nil {
 		return err
 	}
 	for scanner.Scan() {
@@ -98,7 +98,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
-		oldFile :=  "./"  + result // the src file path in mgc home
+		oldFile := "./" + result // the src file path in mgc home
 		newFile := "./" + result // the src file path in mgc home
 		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
 		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
@@ -108,7 +108,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 		for _, function := range newFunctions {
 			fmt.Println("newFunction:", function)
 		}
-		
+
 		// f.Write([]byte("Old Functions\n"))
 		// for _, function := range oldFunctions {
 		// 	// write the function to the output file
@@ -266,6 +266,10 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		if functionName == "operator" {
 			functionName += lineList[1]
 		}
+		re := regexp.MustCompile(`__anon\w*`)
+		if re.MatchString(functionName) {
+			continue
+		}
 		if len(lineList) < 2 {
 			continue
 		}
@@ -290,7 +294,6 @@ func getFunctions(cFilePath string) ([]Function, error) {
 			}
 		}
 		// check in the className a string with __anno* replace it with (anonymous namespace)
-		re := regexp.MustCompile(`__anon\w*`)
 		className = re.ReplaceAllString(className, "(anonymous namespace)")
 		functions = append(functions, Function{Line: lineNumber, fullyQualifiedName: className + functionName, Name: functionName})
 	}
