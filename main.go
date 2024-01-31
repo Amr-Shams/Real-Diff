@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"gogcov/helpers"
 
 	"github.com/spf13/cobra"
 	"github.com/stoicperlman/fls"
@@ -38,18 +39,8 @@ This command is a wrapper around the 'gcov_gen_report' functionality.
 
 // a global variable that holds the info of the command line arguments
 var (
-	// the path of the test directory
-	testPath string
-	// the new date
-	newDate string
-	// the old date
-	oldDate string
-	// the output file
-	outputFile string
-	// the list of the src files
-	srcFiles string
-	// the product name
-	product string
+	go_diffOpts = helpers.ArchiveOpts{}
+	
 )
 
 // Function represents a function in the C source code
@@ -61,14 +52,29 @@ type Function struct {
 	Line               int
 }
 
-// the main functionality the takes the arguments and the path of the C file and returns the functions in the file
+// init function that takes the arguments from the command line
+func init() {
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.TestPath, "testPath", "m", "", "the path of the test directory")
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.NewDate, "newDate", "N", "", "the new date")
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.OldDate, "oldDate", "O", "", "the old date")
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.OutputDir, "outputDir", "o", "", "the output directory")
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.NewSrcPath, "NewSrcPath", "S", "", "the path of the new source directory")
+	removeAndExtract.Flags().StringVarP(&go_diffOpts.ProductName, "product", "p", "", "the product name")
+	removeAndExtract.Flags().BoolVarP(&go_diffOpts.NoRun, "no-run", "n", false, "do not run the test cases")
+
+
+	// mark some flags as required not to be empty
+	removeAndExtract.MarkFlagRequired("testPath")
+	removeAndExtract.MarkFlagRequired("newDate")
+	removeAndExtract.MarkFlagRequired("oldDate")
+	removeAndExtract.MarkFlagRequired("NewSrcPath")
+	rootCmd.AddCommand(removeAndExtract)
+}
+
 func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
-	// check if srcFiles is not empty
-	if srcFiles == "" {
-		return fmt.Errorf("srcFiles cannot be empty")
-	}
+	
 	// check if we can open the srcFiles file
-	srcFilesFile, err := os.Open(srcFiles)
+	srcFilesFile, err := os.Open(go_diffOpts.OutputDir)
 	if err != nil {
 		return err
 	}
@@ -81,65 +87,60 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	var srcFilesList string
 	var AllFunctions string
 	// loop over the src files
-	if testPath != "" {
-		outputFile = testPath + "/" + outputFile
-	}
-	f, err := os.Create(outputFile)
+	outputFile := go_diffOpts.OutputDir + "/" + go_diffOpts.ProductName + "_" + go_diffOpts.NewDate + "_" + go_diffOpts.OldDate + "_" + "go_diff"
+
+	f, err := os.Create(outputFile + ".txt")
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+	// create another outputfile called summary
+	f1, err := os.Create(outputFile + "_summary.txt")
+	if err != nil {
+		return err
+	}
+	defer f1.Close()
+	var listSrcFiles []string // 1 means it is changed/add/deleted 0 means it is not
 	for scanner.Scan() {
 		// get the src file name
 		result := scanner.Text()
 
-		// oldFile := "/wv/cal_nightly_TOT/" + oldDate + ".calibreube." + getWeekDay(oldDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		oldFile := "/wv/cal_nightly_TOT/" + go_diffOpts.OldDate + ".calibreube." + getWeekDay(go_diffOpts.OldDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
-		// newFile := "/wv/cal_nightly_TOT/" + newDate + ".calibreube." + getWeekDay(newDate) + "/ic/lv/src/" + result // the src file path in mgc home
+		newFile := "/wv/cal_nightly_TOT/" + go_diffOpts.NewDate + ".calibreube." + getWeekDay(go_diffOpts.NewDate) + "/ic/lv/src/" + result // the src file path in mgc home
 
 		// fmt.Println("oldFile:", oldFile)
 		// fmt.Println("newFile:", newFile)
-		oldFile := "./" + result // the src file path in mgc home
-		newFile := "./" + result // the src file path in mgc home
+		// oldFile := testPath + "/" + oldDate + "/" + result // the src file path in mgc home
+		// newFile := testPath + "/" + newDate + "/" + result // the src file path in mgc home
 		oldFunctions, _ := removeCommentsAndExtractFunctions(oldFile)
 		newFunctions, _ := removeCommentsAndExtractFunctions(newFile)
-		for _, function := range oldFunctions {
-			fmt.Println("oldFunction:", function)
-		}
-		for _, function := range newFunctions {
-			fmt.Println("newFunction:", function)
-		}
-
-		// f.Write([]byte("Old Functions\n"))
-		// for _, function := range oldFunctions {
-		// 	// write the function to the output file
-		// 	_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
-		// f.Write([]byte("New Functions\n"))
-		// for _, function := range newFunctions {
-		// 	// write the function to the output file
-		// 	_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
-
+		
 		// call the getChangedFunctions function to get the functions that are changed between the 2 dates
 		changedFunctions, AddedFunctions, DeletedFunctions := getChangedFunctions(oldFunctions, newFunctions)
 		// loop over the changed functions
-		f.Write([]byte("Changed Functions\n"))
-		for _, function := range changedFunctions {
+		// check if the file has changed/added/deleted functions
+		if quit := len(DeletedFunctions) + len(AddedFunctions) + len(changedFunctions); quit == 0 {
+			listSrcFiles = append(listSrcFiles, result)
+			fmt.Println("No changes in file:", result)
+			continue
+		}
+		f.Write([]byte(result + "\n"))
+		for idx, function := range changedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Changed Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
 				return err
 			}
 		}
-		// loop over the Deleted functions
-		f.Write([]byte("Deleted Functions\n"))
-		for _, function := range DeletedFunctions {
+
+		for idx, function := range DeletedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Deleted Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
@@ -147,18 +148,15 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			}
 		}
 		// loop over the Added functions
-		f.Write([]byte("Added Functions\n"))
-		for _, function := range AddedFunctions {
+		for idx, function := range AddedFunctions {
+			if idx == 0 {
+				f.Write([]byte("Added Functions\n"))
+			}
 			// write the function to the output file
 			_, err := f.WriteString(fmt.Sprintf("%s %d\n", function.Name, function.Line))
 			if err != nil {
 				return err
 			}
-		}
-		// check if the file has changed/added/deleted functions
-		if quit := len(DeletedFunctions) + len(AddedFunctions) + len(changedFunctions); quit == 0 {
-			fmt.Println("No changes in file:", result)
-			continue
 		}
 		fmt.Println("the file has changed/added/deleted functions:", result)
 		srcFilesList += result + ","
@@ -172,6 +170,7 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 			AllFunctions += function.fullyQualifiedName + ","
 		}
 
+		f.Write([]byte("/*******************/\n"))
 	}
 	// remove the last comma
 	if len(srcFilesList) > 0 {
@@ -180,37 +179,21 @@ func removeAndExtractFunctions(cmd *cobra.Command, args []string) error {
 	if len(AllFunctions) > 0 {
 		AllFunctions = AllFunctions[:len(AllFunctions)-1]
 	}
+	writeToFileStr(go_diffOpts.OutputDir+"srcFiles.txt", srcFilesList)
 
-	// call the getTestCases function to get the test cases that cover all the changed/added/deleted functions
+	writeToFileStr(go_diffOpts.OutputDir+"functions.txt", AllFunctions)
 
-	// for debugging
-	if len(AllFunctions) == 0 || len(srcFilesList) == 0 {
-		fmt.Println("No changes in the module")
+	writeToFileList(go_diffOpts.OutputDir+"srcFilesList.txt", listSrcFiles)
+
+	if go_diffOpts.NoRun {
 		return nil
 	}
-	// testCases := getTestCases(AllFunctions, srcFilesList)
-	// for debugging
-	// fmt.Println("Test Cases:", testCases)
-	// call the writeToFile function to write the test cases to the output file
-	// writeToFile(outputFile+"testCases", testCases)
+	// get the test cases from the db
+	testCases := getTestCases(AllFunctions, srcFilesList)
+	// write the test cases to a file
+	writeToFileList(outputFile+"_testCases.txt", testCases)
+
 	return nil
-}
-
-// init function that takes the arguments from the command line
-func init() {
-	removeAndExtract.Flags().StringVarP(&testPath, "testPath", "m", "", "the path of the test directory")
-	removeAndExtract.Flags().StringVarP(&newDate, "newDate", "N", "", "the new date")
-	removeAndExtract.Flags().StringVarP(&oldDate, "oldDate", "O", "", "the old date")
-	removeAndExtract.Flags().StringVarP(&outputFile, "outputFile", "f", "", "the output file")
-	removeAndExtract.Flags().StringVarP(&srcFiles, "srcFiles", "s", "", "the list of the src files")
-	removeAndExtract.Flags().StringVarP(&srcFiles, "product", "p", "", "the product name")
-
-	// mark some flags as required not to be empty
-	removeAndExtract.MarkFlagRequired("newDate")
-	removeAndExtract.MarkFlagRequired("oldDate")
-	removeAndExtract.MarkFlagRequired("outputFile")
-	removeAndExtract.MarkFlagRequired("srcFiles")
-
 }
 
 // Main functioon that takes the path of the C file as an argument
@@ -250,7 +233,7 @@ func removeCommentsAndExtractFunctions(filePath string) ([]Function, error) {
 }
 
 func getFunctions(cFilePath string) ([]Function, error) {
-	cmd := exec.Command("ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
+	cmd := exec.Command("./ctags/ctags", "-n", "--kinds-C++=f", "--fields=+{typeref}", "-o", "-", cFilePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running ctags: %v", err)
@@ -266,11 +249,12 @@ func getFunctions(cFilePath string) ([]Function, error) {
 		if functionName == "operator" {
 			functionName += lineList[1]
 		}
-		re := regexp.MustCompile(`__anon\w*`)
-		if re.MatchString(functionName) {
+		if len(lineList) < 2 {
 			continue
 		}
-		if len(lineList) < 2 {
+		// check if the unc is lambda function
+		re := regexp.MustCompile(`__anon\w*`)
+		if re.MatchString(functionName) {
 			continue
 		}
 		var lineNumber int
@@ -434,6 +418,8 @@ func cleanFunctionBody(functionBody string) string {
 	functionBody = strings.ReplaceAll(functionBody, "\n", "")
 	functionBody = strings.ReplaceAll(functionBody, "\t", "")
 	functionBody = strings.ReplaceAll(functionBody, " ", "")
+	functionBody = strings.ReplaceAll(functionBody, "\r", "")
+	functionBody = strings.ReplaceAll(functionBody, "\x00", "")
 	return functionBody
 }
 func getChangedFunctions(oldFunctions []Function, newFunctions []Function) ([]Function, []Function, []Function) {
@@ -495,36 +481,9 @@ func getWeekDay(date string) string {
 */
 func getTestCases(functions string, srcFiles string) []string {
 
-	// writ the srcfle into a file
-	f, err := os.Create(outputFile + "srcFiles")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", srcFiles))
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	//write the functions to another file
-	f, err = os.Create(outputFile + "functions")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	defer f.Close()
-	// write the functions to the output file
-	_, err = f.WriteString(fmt.Sprintf("%s\n", functions))
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
+	cmdArgs := []string{"gogcov", "search", "testcases", "--srcfiles-file", go_diffOpts.OutputDir + "srcFiles.txt", "--functions-file", go_diffOpts.OutputDir + "functions.txt"}
+	cmdArgs = append(cmdArgs, "--products", go_diffOpts.ProductName)
 
-	// excutte the command of the follwoing format
-	// gogcov search testcases --srcfiles <srcfiles> --products productname --functions <functions>
-	// the output of the command is a list of the test cases that cover the functions write them into the output file
-	cmdArgs := []string{"gogcov", "search", "testcases", "--srcfiles", srcFiles, "--functions", functions}
-	if product != "" {
-		cmdArgs = append(cmdArgs, "--products", product)
-	}
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -544,7 +503,7 @@ func getTestCases(functions string, srcFiles string) []string {
 /*
 * function to write to an output file
  */
-func writeToFile(outputFile string, testCases []string) {
+func writeToFileList(outputFile string, testCases []string) {
 	// create a new file to write the functions that are changed between the 2 dates
 	f, err := os.Create(outputFile)
 	if err != nil {
@@ -559,4 +518,23 @@ func writeToFile(outputFile string, testCases []string) {
 			fmt.Println("Error:", err)
 		}
 	}
+}
+
+//////////////////////////////
+/*
+* function to write a string to an output file
+ */
+
+func writeToFileStr(outputFile string, functions string) {
+	f, err := os.Create(outputFile)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	defer f.Close()
+	functions = strings.ReplaceAll(functions, ",", "\n")
+	_, err = f.WriteString(fmt.Sprintf("%s\n", functions))
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
 }
