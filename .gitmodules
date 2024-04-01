@@ -1,0 +1,3 @@
+[submodule "data-vizlauize"]
+	path = data-vizlauize
+	url = https://calgit.wv.mentorg.com/qa_infrastructure/tools_and_utilites/data-visualize.git
